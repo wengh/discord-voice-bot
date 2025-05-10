@@ -4,6 +4,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()  # take environment variables
 
@@ -23,7 +24,7 @@ async def on_ready() -> None:
 
 @bot.command(name="join")
 async def join(ctx: commands.Context) -> None:
-    """Join the user's voice channel."""
+    """Join the user's voice channel and play an audio file."""
     if not ctx.author.voice:
         await ctx.send("You are not connected to a voice channel.")
         return
@@ -34,9 +35,25 @@ async def join(ctx: commands.Context) -> None:
     if ctx.voice_client is not None:
         await ctx.voice_client.move_to(voice_channel)
     else:
-        await voice_channel.connect()
+        voice_client = await voice_channel.connect()
 
-    await ctx.send(f"Joined {voice_channel.name}!")
+    # Get voice client if we didn't just connect
+    voice_client = ctx.voice_client or voice_client
+
+    # Path to the audio file
+    audio_file = os.path.join(r"/mnt/c/repos/MeowyPlayer/music/Pluie sur la ville.mp3")
+
+    # Check if the file exists
+    if not os.path.exists(audio_file):
+        await ctx.send(
+            f"Joined {voice_channel.name}! (Audio file not found: {audio_file})"
+        )
+        return
+
+    # Play the audio file
+    voice_client.play(discord.FFmpegPCMAudio(audio_file))
+
+    await ctx.send(f"Joined {voice_channel.name} and playing welcome audio!")
 
 
 @bot.event
