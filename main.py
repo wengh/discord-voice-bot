@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import tempfile
@@ -9,6 +10,13 @@ from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 
 intents: discord.Intents = discord.Intents.default()
@@ -26,7 +34,7 @@ def _clean_emojis(text: str) -> str:
 
 @bot.event
 async def on_ready() -> None:
-    print(f"We have logged in as {bot.user}")
+    logger.info(f"We have logged in as {bot.user}")
 
 
 @bot.slash_command()
@@ -76,7 +84,7 @@ async def on_voice_state_update(
             # If there are no non-bot members left, disconnect
             if len(members) == 0:
                 await voice_client.disconnect()
-                print(
+                logger.info(
                     f"Left voice channel {voice_client.channel.name} because it's empty."
                 )
 
@@ -90,6 +98,7 @@ async def on_message(message: discord.Message) -> None:
     if (
         message.guild
         and message.guild.voice_client
+        and message.guild.voice_client.is_connected()
         and message.channel.id == message.guild.voice_client.channel.id
     ):
         # Convert text to speech using Microsoft Edge TTS
@@ -98,6 +107,7 @@ async def on_message(message: discord.Message) -> None:
                 # Since we're already in an async function, we can await directly
                 content = message.clean_content
                 content = _clean_emojis(content)
+                logger.info(f"Converting message to speech: {content}")
                 communicate = edge_tts.Communicate(content, "zh-CN-XiaoyiNeural")
                 await communicate.save(tmp_file.name)
 
@@ -114,11 +124,11 @@ async def on_message(message: discord.Message) -> None:
                 )
         except NoAudioReceived:
             # Silently ignore when no audio is received
-            print(f"No audio received for message: {message.content}")
+            logger.error(f"No audio received for message: {message.content}")
 
 
 token: Optional[str] = os.getenv("BOT_TOKEN")
 if token is not None:
     bot.run(token)
 else:
-    print("Error: BOT_TOKEN not found in environment variables.")
+    logger.error("BOT_TOKEN not found in environment variables.")
