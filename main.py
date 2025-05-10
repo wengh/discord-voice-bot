@@ -49,12 +49,36 @@ async def join(ctx: discord.ApplicationContext) -> None:
 
 @bot.slash_command()
 async def leave(ctx: discord.ApplicationContext) -> None:
-    """Join the user's voice channel for TTS messages."""
+    """Leave the voice channel."""
     if not ctx.voice_client:
         await ctx.respond("I am not connected to a voice channel.")
         return
     await ctx.voice_client.disconnect()
     await ctx.respond("Disconnected from the voice channel.")
+
+
+@bot.event
+async def on_voice_state_update(
+    member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
+) -> None:
+    """Monitor voice state changes and leave if bot is alone in the voice channel."""
+    # Skip if it's the bot's own state change
+    if member.id == bot.user.id:
+        return
+
+    # Loop through all voice clients the bot has
+    for voice_client in bot.voice_clients:
+        # Check if the voice client is connected and has a channel
+        if voice_client.is_connected() and voice_client.channel:
+            # Get all members in the voice channel except the bot
+            members = [m for m in voice_client.channel.members if not m.bot]
+
+            # If there are no non-bot members left, disconnect
+            if len(members) == 0:
+                await voice_client.disconnect()
+                print(
+                    f"Left voice channel {voice_client.channel.name} because it's empty."
+                )
 
 
 @bot.event
