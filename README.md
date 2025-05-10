@@ -24,6 +24,11 @@
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
+2. Install the dependencies:
+   ```bash
+   uv sync
+   ```
+
 3. Run the bot:
    ```bash
    uv run main.py
