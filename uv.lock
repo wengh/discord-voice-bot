@@ -98,36 +98,19 @@ wheels = [
 ]
 
 [[package]]
-name = "discord-py"
-version = "2.5.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "aiohttp" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/7f/dd/5817c7af5e614e45cdf38cbf6c3f4597590c442822a648121a34dee7fa0f/discord_py-2.5.2.tar.gz", hash = "sha256:01cd362023bfea1a4a1d43f5280b5ef00cad2c7eba80098909f98bf28e578524", size = 1054879, upload_time = "2025-03-05T01:15:29.798Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/a8/dc908a0fe4cd7e3950c9fa6906f7bf2e5d92d36b432f84897185e1b77138/discord_py-2.5.2-py3-none-any.whl", hash = "sha256:81f23a17c50509ffebe0668441cb80c139e74da5115305f70e27ce821361295a", size = 1155105, upload_time = "2025-03-05T01:15:27.323Z" },
-]
-
-[package.optional-dependencies]
-voice = [
-    { name = "pynacl" },
-]
-
-[[package]]
 name = "discord-voice-bot"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "discord-py", extra = ["voice"] },
     { name = "edge-tts" },
+    { name = "py-cord", extra = ["voice"] },
     { name = "python-dotenv" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "discord-py", extras = ["voice"], specifier = ">=2.5.2" },
     { name = "edge-tts", specifier = ">=7.0.2" },
+    { name = "py-cord", extras = ["voice"], specifier = ">=2.6.1" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
 ]
 
@@ -231,6 +214,23 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/54/6e/30a11f4417d9266b5a464ac5a8c5164ddc9dd153dfa77bf57918165eb4ae/propcache-0.3.1-cp311-cp311-win32.whl", hash = "sha256:58aa11f4ca8b60113d4b8e32d37e7e78bd8af4d1a5b5cb4979ed856a45e62005", size = 40859, upload_time = "2025-03-26T03:04:24.039Z" },
     { url = "https://files.pythonhosted.org/packages/1d/3a/8a68dd867da9ca2ee9dfd361093e9cb08cb0f37e5ddb2276f1b5177d7731/propcache-0.3.1-cp311-cp311-win_amd64.whl", hash = "sha256:9532ea0b26a401264b1365146c440a6d78269ed41f83f23818d4b79497aeabe7", size = 45153, upload_time = "2025-03-26T03:04:25.211Z" },
     { url = "https://files.pythonhosted.org/packages/b8/d3/c3cb8f1d6ae3b37f83e1de806713a9b3642c5895f0215a62e1a4bd6e5e34/propcache-0.3.1-py3-none-any.whl", hash = "sha256:9a8ecf38de50a7f518c21568c80f985e776397b902f1ce0b01f799aba1608b40", size = 12376, upload_time = "2025-03-26T03:06:10.5Z" },
+]
+
+[[package]]
+name = "py-cord"
+version = "2.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/c7/c539d69d5cfa1ea5891d596212f73d619e40c7fc9f02ae906f4147993b94/py_cord-2.6.1.tar.gz", hash = "sha256:36064f225f2c7bbddfe542d5ed581f2a5744f618e039093cf7cd2659a58bc79b", size = 965087, upload_time = "2024-09-15T19:36:39.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/90/2690ded84e34b15ca2619932a358c1b7dc6d28fe845dfbd01929fc33c9da/py_cord-2.6.1-py3-none-any.whl", hash = "sha256:e3d3b528c5e37b0e0825f5b884cbb9267860976c1e4878e28b55da8fd3af834b", size = 1089154, upload_time = "2024-09-15T19:36:35.34Z" },
+]
+
+[package.optional-dependencies]
+voice = [
+    { name = "pynacl" },
 ]
 
 [[package]]

@@ -5,7 +5,6 @@ from typing import Optional
 
 import discord
 import edge_tts
-from discord.ext import commands
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 
@@ -16,7 +15,13 @@ intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 
-bot = commands.Bot(command_prefix="$", intents=intents)
+bot = discord.Bot(command_prefix="$", intents=intents)
+
+
+def _clean_emojis(text: str) -> str:
+    """Remove Discord emojis from the text."""
+    text = re.sub(r"<a?:(\w+):\d+>", r"\1", text).strip()
+    return text
 
 
 @bot.event
@@ -24,11 +29,11 @@ async def on_ready() -> None:
     print(f"We have logged in as {bot.user}")
 
 
-@bot.command(name="join")
-async def join(ctx: commands.Context) -> None:
+@bot.slash_command()
+async def join(ctx: discord.ApplicationContext) -> None:
     """Join the user's voice channel for TTS messages."""
     if not ctx.author.voice:
-        await ctx.send("You are not connected to a voice channel.")
+        await ctx.respond("Join a voice channel first!")
         return
 
     voice_channel = ctx.author.voice.channel
@@ -39,13 +44,17 @@ async def join(ctx: commands.Context) -> None:
     else:
         await voice_channel.connect()
 
-    await ctx.send(f"Joined {voice_channel.name}! I will read messages out loud.")
+    await ctx.respond(f"Joined {voice_channel.name}! I will read messages out loud.")
 
 
-def _clean_emojis(text: str) -> str:
-    """Remove Discord emojis from the text."""
-    text = re.sub(r"<a?:(\w+):\d+>", r"\1", text).strip()
-    return text
+@bot.slash_command()
+async def leave(ctx: discord.ApplicationContext) -> None:
+    """Join the user's voice channel for TTS messages."""
+    if not ctx.voice_client:
+        await ctx.respond("I am not connected to a voice channel.")
+        return
+    await ctx.voice_client.disconnect()
+    await ctx.respond("Disconnected from the voice channel.")
 
 
 @bot.event
@@ -53,13 +62,9 @@ async def on_message(message: discord.Message) -> None:
     if message.author == bot.user:
         return
 
-    if message.content.startswith("$hello"):
-        await message.channel.send("Hello!")
-
     # Check if the message is not a command, the bot is in a voice channel, and the message is from the voice channel's text chat
     if (
-        not message.content.startswith(bot.command_prefix)
-        and message.guild
+        message.guild
         and message.guild.voice_client
         and message.channel.id == message.guild.voice_client.channel.id
     ):
@@ -86,9 +91,6 @@ async def on_message(message: discord.Message) -> None:
         except NoAudioReceived:
             # Silently ignore when no audio is received
             print(f"No audio received for message: {message.content}")
-
-    # Process commands
-    await bot.process_commands(message)
 
 
 token: Optional[str] = os.getenv("BOT_TOKEN")
