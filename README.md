@@ -24,12 +24,14 @@
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-2. Install the dependencies:
+2. Install ffmpeg if you haven't already:
    ```bash
-   uv sync
+   # For Ubuntu/Debian
+   sudo apt update
+   sudo apt install ffmpeg
    ```
 
-3. Run the bot:
+3. Setup venv and run the bot:
    ```bash
    uv run main.py
    ```
