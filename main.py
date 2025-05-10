@@ -1,7 +1,7 @@
 import logging
 import os
+import queue
 import re
-import tempfile
 from typing import Optional
 
 import discord
@@ -13,7 +13,8 @@ load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format="%(asctime)s %(name)s %(levelname)s  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,37 @@ def _clean_emojis(text: str) -> str:
     """Remove Discord emojis from the text."""
     text = re.sub(r"<a?:(\w+):\d+>", r"\1", text).strip()
     return text
+
+
+class QueueIO:
+    """Producer-consumer queue for streaming audio data."""
+
+    _eof = object()
+
+    def __init__(self):
+        self.q = queue.Queue()
+
+    def write(self, data: bytes) -> int:
+        self.q.put(data)
+        return len(data)
+
+    def read(self, size: Optional[int] = -1) -> bytes:
+        data = self.q.get()
+        if data is self._eof:
+            return b""
+        return data
+
+    def done(self):
+        self.q.put(self._eof)
+
+    def readable(self) -> bool:
+        return True
+
+    def writable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return False
 
 
 @bot.event
@@ -71,22 +103,27 @@ async def on_voice_state_update(
 ) -> None:
     """Monitor voice state changes and leave if bot is alone in the voice channel."""
     # Skip if it's the bot's own state change
-    if member.id == bot.user.id:
+    voice_client = member.guild.voice_client
+    if not voice_client:
         return
 
-    # Loop through all voice clients the bot has
-    for voice_client in bot.voice_clients:
-        # Check if the voice client is connected and has a channel
-        if voice_client.is_connected() and voice_client.channel:
-            # Get all members in the voice channel except the bot
-            members = [m for m in voice_client.channel.members if not m.bot]
+    if member.id == bot.user.id:
+        # Disconnect if the bot left the channel
+        if before.channel != after.channel and voice_client.is_playing():
+            logger.info(f"Interrupting voice playback for {member.name}.")
+            voice_client.stop()
+        return
 
-            # If there are no non-bot members left, disconnect
-            if len(members) == 0:
-                await voice_client.disconnect()
-                logger.info(
-                    f"Left voice channel {voice_client.channel.name} because it's empty."
-                )
+    if voice_client.is_connected() and voice_client.channel:
+        # Get all members in the voice channel except the bot
+        members = [m for m in voice_client.channel.members if not m.bot]
+
+        # If there are no non-bot members left, disconnect
+        if len(members) == 0:
+            await voice_client.disconnect()
+            logger.info(
+                f"Left voice channel {voice_client.channel.name} because it's empty."
+            )
 
 
 @bot.event
@@ -103,25 +140,36 @@ async def on_message(message: discord.Message) -> None:
     ):
         # Convert text to speech using Microsoft Edge TTS
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                # Since we're already in an async function, we can await directly
-                content = message.clean_content
-                content = _clean_emojis(content)
-                logger.info(f"Converting message to speech: {content}")
-                communicate = edge_tts.Communicate(content, "zh-CN-XiaoyiNeural")
-                await communicate.save(tmp_file.name)
+            # Since we're already in an async function, we can await directly
+            content = message.clean_content
+            content = _clean_emojis(content)
+            logger.info(f"Converting message to speech: {content}")
+            communicate = edge_tts.Communicate(content, "zh-CN-XiaoyiNeural")
+            file = QueueIO()
 
-                voice_client = message.guild.voice_client
+            voice_client = message.guild.voice_client
 
-                # Check if voice client is already playing
-                if voice_client.is_playing():
-                    voice_client.stop()
+            # Check if voice client is already playing
+            if voice_client.is_playing():
+                voice_client.stop()
 
-                # Play the audio
-                voice_client.play(
-                    discord.FFmpegPCMAudio(tmp_file.name),
-                    after=lambda e: os.remove(tmp_file.name),
-                )
+            # Play the audio
+            future = voice_client.play(
+                discord.FFmpegPCMAudio(file, pipe=True),
+                wait_finish=True,
+            )
+
+            try:
+                async for chunk in communicate.stream():
+                    if future.done():
+                        logger.info("Voice interrupted before stream finished.")
+                        break
+                    if chunk["type"] == "audio":
+                        file.write(chunk["data"])
+            finally:
+                file.done()
+
+            await future
         except NoAudioReceived:
             # Silently ignore when no audio is received
             logger.error(f"No audio received for message: {message.content}")
