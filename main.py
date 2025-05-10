@@ -1,20 +1,21 @@
 import os
+import re
 import tempfile
 from typing import Optional
 
 import discord
+import edge_tts
 from discord.ext import commands
 from dotenv import load_dotenv
-from gtts import gTTS  # Google Text-to-Speech
+from edge_tts.exceptions import NoAudioReceived
 
-load_dotenv()  # take environment variables
+load_dotenv()
 
 
 intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 
-# Using commands.Bot instead of discord.Client for command handling
 bot = commands.Bot(command_prefix="$", intents=intents)
 
 
@@ -41,6 +42,12 @@ async def join(ctx: commands.Context) -> None:
     await ctx.send(f"Joined {voice_channel.name}! I will read messages out loud.")
 
 
+def _clean_emojis(text: str) -> str:
+    """Remove Discord emojis from the text."""
+    text = re.sub(r"<a?:(\w+):\d+>", r"\1", text).strip()
+    return text
+
+
 @bot.event
 async def on_message(message: discord.Message) -> None:
     if message.author == bot.user:
@@ -49,28 +56,36 @@ async def on_message(message: discord.Message) -> None:
     if message.content.startswith("$hello"):
         await message.channel.send("Hello!")
 
-    # Check if the message is not a command and the bot is in a voice channel
+    # Check if the message is not a command, the bot is in a voice channel, and the message is from the voice channel's text chat
     if (
         not message.content.startswith(bot.command_prefix)
         and message.guild
         and message.guild.voice_client
+        and message.channel.id == message.guild.voice_client.channel.id
     ):
-        # Convert text to speech
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-            tts = gTTS(text=message.content, lang="en", slow=False)
-            tts.save(tmp_file.name)
+        # Convert text to speech using Microsoft Edge TTS
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+                # Since we're already in an async function, we can await directly
+                content = message.clean_content
+                content = _clean_emojis(content)
+                communicate = edge_tts.Communicate(content, "zh-CN-XiaoyiNeural")
+                await communicate.save(tmp_file.name)
 
-            voice_client = message.guild.voice_client
+                voice_client = message.guild.voice_client
 
-            # Check if voice client is already playing
-            if voice_client.is_playing():
-                voice_client.stop()
+                # Check if voice client is already playing
+                if voice_client.is_playing():
+                    voice_client.stop()
 
-            # Play the audio
-            voice_client.play(
-                discord.FFmpegPCMAudio(tmp_file.name),
-                after=lambda e: os.remove(tmp_file.name),
-            )
+                # Play the audio
+                voice_client.play(
+                    discord.FFmpegPCMAudio(tmp_file.name),
+                    after=lambda e: os.remove(tmp_file.name),
+                )
+        except NoAudioReceived:
+            # Silently ignore when no audio is received
+            print(f"No audio received for message: {message.content}")
 
     # Process commands
     await bot.process_commands(message)
