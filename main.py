@@ -11,12 +11,6 @@ from edge_tts.exceptions import NoAudioReceived
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(name)s %(levelname)s  %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -176,6 +170,13 @@ async def on_message(message: discord.Message) -> None:
 
 
 if __name__ == "__main__":
+    # Set up logging to show more info like timestamps
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s  %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     # Load libopus.so from path specified in Dockerfile
     # Otherwise ctypes.util.find_library fails to find it in the container
     libopus_path = os.getenv("LIBOPUS_PATH")
@@ -183,7 +184,7 @@ if __name__ == "__main__":
         discord.opus.load_opus(libopus_path)
 
     token: Optional[str] = os.getenv("BOT_TOKEN")
-    if token is not None:
-        bot.run(token)
-    else:
+    if token is None:
         logger.error("BOT_TOKEN not found in environment variables.")
+
+    bot.run(token)
