@@ -1,10 +1,11 @@
 import os
+import tempfile
 from typing import Optional
 
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-import asyncio
+from gtts import gTTS  # Google Text-to-Speech
 
 load_dotenv()  # take environment variables
 
@@ -24,7 +25,7 @@ async def on_ready() -> None:
 
 @bot.command(name="join")
 async def join(ctx: commands.Context) -> None:
-    """Join the user's voice channel and play an audio file."""
+    """Join the user's voice channel for TTS messages."""
     if not ctx.author.voice:
         await ctx.send("You are not connected to a voice channel.")
         return
@@ -35,25 +36,9 @@ async def join(ctx: commands.Context) -> None:
     if ctx.voice_client is not None:
         await ctx.voice_client.move_to(voice_channel)
     else:
-        voice_client = await voice_channel.connect()
+        await voice_channel.connect()
 
-    # Get voice client if we didn't just connect
-    voice_client = ctx.voice_client or voice_client
-
-    # Path to the audio file
-    audio_file = os.path.join(r"/mnt/c/repos/MeowyPlayer/music/Pluie sur la ville.mp3")
-
-    # Check if the file exists
-    if not os.path.exists(audio_file):
-        await ctx.send(
-            f"Joined {voice_channel.name}! (Audio file not found: {audio_file})"
-        )
-        return
-
-    # Play the audio file
-    voice_client.play(discord.FFmpegPCMAudio(audio_file))
-
-    await ctx.send(f"Joined {voice_channel.name} and playing welcome audio!")
+    await ctx.send(f"Joined {voice_channel.name}! I will read messages out loud.")
 
 
 @bot.event
@@ -63,6 +48,29 @@ async def on_message(message: discord.Message) -> None:
 
     if message.content.startswith("$hello"):
         await message.channel.send("Hello!")
+
+    # Check if the message is not a command and the bot is in a voice channel
+    if (
+        not message.content.startswith(bot.command_prefix)
+        and message.guild
+        and message.guild.voice_client
+    ):
+        # Convert text to speech
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            tts = gTTS(text=message.content, lang="en", slow=False)
+            tts.save(tmp_file.name)
+
+            voice_client = message.guild.voice_client
+
+            # Check if voice client is already playing
+            if voice_client.is_playing():
+                voice_client.stop()
+
+            # Play the audio
+            voice_client.play(
+                discord.FFmpegPCMAudio(tmp_file.name),
+                after=lambda e: os.remove(tmp_file.name),
+            )
 
     # Process commands
     await bot.process_commands(message)
