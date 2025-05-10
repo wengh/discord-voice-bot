@@ -175,8 +175,15 @@ async def on_message(message: discord.Message) -> None:
             logger.error(f"No audio received for message: {message.content}")
 
 
-token: Optional[str] = os.getenv("BOT_TOKEN")
-if token is not None:
-    bot.run(token)
-else:
-    logger.error("BOT_TOKEN not found in environment variables.")
+if __name__ == "__main__":
+    # Load libopus.so from path specified in Dockerfile
+    # Otherwise ctypes.util.find_library fails to find it in the container
+    libopus_path = os.getenv("LIBOPUS_PATH")
+    if libopus_path:
+        discord.opus.load_opus(libopus_path)
+
+    token: Optional[str] = os.getenv("BOT_TOKEN")
+    if token is not None:
+        bot.run(token)
+    else:
+        logger.error("BOT_TOKEN not found in environment variables.")
