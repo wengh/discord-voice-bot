@@ -1,5 +1,20 @@
 # discord-voice-bot
 
+A very simple Discord bot that turns voice channel text chat messages into voice using edge-tts.
+
+## Usage
+
+1. Invite the bot to your server using by replacing `{APPLICATION_ID}` in the url with your bot's application ID.
+   ```
+   https://discord.com/oauth2/authorize?client_id={APPLICATION_ID}&permissions=0&integration_type=0&scope=bot
+   ```
+
+2. Join a voice channel in your server.
+
+3. Use the `/join` slash command in the corresponding text channel to make the bot join the voice channel.
+
+4. All text messages in the text channel will be converted to speech and played in the voice channel.
+
 ## Installation
 
 ### Initial setup
@@ -10,9 +25,10 @@
    cd discord-voice-bot
    ```
 
-2. Create a `.env` file with your Discord bot token:
-   ```
-   BOT_TOKEN=your_token_here
+2. Edit the `.env` file to set your bot token and edge-tts voice:
+   ```bash
+   cp .env.example .env
+   nano .env
    ```
 
 ### Running the bot

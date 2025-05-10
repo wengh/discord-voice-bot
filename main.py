@@ -6,6 +6,7 @@ from typing import Optional
 
 import discord
 import edge_tts
+import edge_tts.constants
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 
@@ -18,7 +19,7 @@ intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 
-bot = discord.Bot(command_prefix="$", intents=intents)
+bot = discord.Bot(intents=intents)
 
 
 def _clean_emojis(text: str) -> str:
@@ -138,7 +139,8 @@ async def on_message(message: discord.Message) -> None:
             content = message.clean_content
             content = _clean_emojis(content)
             logger.info(f"Converting message to speech: {content}")
-            communicate = edge_tts.Communicate(content, "zh-CN-XiaoyiNeural")
+            voice = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
+            communicate = edge_tts.Communicate(content, voice)
             file = QueueIO()
 
             voice_client = message.guild.voice_client
