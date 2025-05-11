@@ -125,13 +125,15 @@ async def join(ctx: discord.ApplicationContext) -> None:
     voice_channel = ctx.author.voice.channel
 
     # Check if the bot is already in a voice channel
-    await guild.change_voice_state(
-        channel=voice_channel, self_mute=False, self_deaf=True
-    )
     if guild.voice_client is not None:
         await guild.voice_client.move_to(voice_channel)
     else:
         await voice_channel.connect()
+
+    # Self-deaf the bot to let users know that it doesn't hear anything
+    await guild.change_voice_state(
+        channel=voice_channel, self_mute=False, self_deaf=True
+    )
 
     await ctx.respond(f"Joined {voice_channel.name}! I will read messages out loud.")
 
