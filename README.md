@@ -16,6 +16,8 @@ Note:
 
 4. All text messages in the text channel will be converted to speech and played in the voice channel.
 
+https://github.com/user-attachments/assets/32754891-3649-4af4-81c0-dd34c5794a78
+
 ## Installation
 
 ### Initial setup
