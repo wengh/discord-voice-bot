@@ -4,5 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     pull_policy: build
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
