@@ -124,6 +124,10 @@ async def join(ctx: discord.ApplicationContext) -> None:
 
     voice_channel = ctx.author.voice.channel
 
+    logger.info(
+        f"Invited to join #{voice_channel.name} in {guild.name} by {ctx.author.name}."
+    )
+
     # Check if the bot is already in a voice channel
     if guild.voice_client is not None:
         await guild.voice_client.move_to(voice_channel)
