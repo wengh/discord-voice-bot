@@ -2,12 +2,11 @@
 
 A very simple Discord bot that turns voice channel text chat messages into voice using edge-tts.
 
-## Usage
+## Demo
 
-1. Invite the bot to your server using by replacing `{APPLICATION_ID}` in the url with your bot's application ID.
-   ```
-   https://discord.com/oauth2/authorize?client_id={APPLICATION_ID}&permissions=0&integration_type=0&scope=bot
-   ```
+Note: The demo is hosted on a always-free OCI VM.Standard.E2.1.Micro instance. It only has 1 GB of RAM and 1 CPU core. No guarantees on uptime or performance.
+
+1. Invite the bot to your server: https://discord.com/oauth2/authorize?client_id=1370595730221305967&permissions=0&integration_type=0&scope=bot
 
 2. Join a voice channel in your server.
 
