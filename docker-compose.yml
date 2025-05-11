@@ -4,9 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     pull_policy: build
-    env_file:
-      - path: .env
-        required: false
-      - path: stack.env
-        required: false
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - EDGE_TTS_VOICE=${EDGE_TTS_VOICE}
     restart: unless-stopped
