@@ -3,5 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    pull_policy: build
     env_file: .env
     restart: unless-stopped
