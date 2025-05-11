@@ -119,7 +119,7 @@ async def join(ctx: discord.ApplicationContext) -> None:
     """Join the user's voice channel for TTS messages."""
     guild: discord.Guild = ctx.guild
     if not ctx.author.voice or not ctx.guild:
-        await ctx.respond("Join a voice channel first!")
+        await ctx.send_response("Join a voice channel first!", ephemeral=True)
         return
 
     voice_channel = ctx.author.voice.channel
@@ -139,17 +139,19 @@ async def join(ctx: discord.ApplicationContext) -> None:
         channel=voice_channel, self_mute=False, self_deaf=True
     )
 
-    await ctx.respond(f"Joined {voice_channel.name}! I will read messages out loud.")
+    await ctx.respond(
+        f"Joined {voice_channel.name}! I will read messages out loud.", ephemeral=True
+    )
 
 
 @bot.slash_command()
 async def leave(ctx: discord.ApplicationContext) -> None:
     """Leave the voice channel."""
     if not ctx.voice_client:
-        await ctx.respond("I am not connected to a voice channel.")
+        await ctx.respond("I am not connected to a voice channel.", ephemeral=True)
         return
     await ctx.voice_client.disconnect()
-    await ctx.respond("Disconnected from the voice channel.")
+    await ctx.respond("Disconnected from the voice channel.", ephemeral=True)
 
 
 @bot.event
