@@ -117,15 +117,19 @@ async def on_ready() -> None:
 @bot.slash_command()
 async def join(ctx: discord.ApplicationContext) -> None:
     """Join the user's voice channel for TTS messages."""
-    if not ctx.author.voice:
+    guild: discord.Guild = ctx.guild
+    if not ctx.author.voice or not ctx.guild:
         await ctx.respond("Join a voice channel first!")
         return
 
     voice_channel = ctx.author.voice.channel
 
     # Check if the bot is already in a voice channel
-    if ctx.voice_client is not None:
-        await ctx.voice_client.move_to(voice_channel)
+    await guild.change_voice_state(
+        channel=voice_channel, self_mute=False, self_deaf=True
+    )
+    if guild.voice_client is not None:
+        await guild.voice_client.move_to(voice_channel)
     else:
         await voice_channel.connect()
 
