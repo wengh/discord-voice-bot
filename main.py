@@ -220,8 +220,6 @@ async def on_message(message: discord.Message) -> None:
             first = None
             try:
                 async for chunk in communicate.stream():
-                    # Start playing only when the first audio chunk is received
-                    # to avoid unnecessarily starting ffmpeg process
                     if first is None:
                         first = time.time()
                     if future.done():

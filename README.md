@@ -43,14 +43,7 @@ https://github.com/user-attachments/assets/32754891-3649-4af4-81c0-dd34c5794a78
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-2. Install ffmpeg if you haven't already:
-   ```bash
-   # For Ubuntu/Debian
-   sudo apt update
-   sudo apt install ffmpeg
-   ```
-
-3. Setup venv and run the bot:
+2. Setup venv and run the bot:
    ```bash
    uv run main.py
    ```
