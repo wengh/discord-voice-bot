@@ -3,12 +3,12 @@ import os
 import queue
 import re
 import time
-from asyncio import Future
 from typing import Optional
 
 import discord
 import edge_tts
 import edge_tts.constants
+import miniaudio
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 
@@ -30,34 +30,82 @@ def _clean_emojis(text: str) -> str:
     return text
 
 
-class QueueIO:
+class QueueSource(miniaudio.StreamableSource):
     """Producer-consumer queue for streaming audio data."""
 
     _eof = object()
 
     def __init__(self):
-        self.q = queue.Queue()
+        self.q = queue.Queue[bytes]()
+        self.buffer = bytearray()
+        self.finished = False
 
     def write(self, data: bytes) -> int:
         self.q.put(data)
         return len(data)
 
-    def read(self, size: Optional[int] = -1) -> bytes:
+    def read(self, size: int) -> bytes:
+        if self.finished:
+            return b""
         data = self.q.get()
         if data is self._eof:
+            self.finished = True
             return b""
         return data
 
     def done(self):
         self.q.put(self._eof)
 
-    def readable(self) -> bool:
-        return True
 
-    def writable(self) -> bool:
-        return True
+class MP3AudioSource(discord.AudioSource):
+    """Reads MP3 data and decodes it in-process to 48 kHz stereo 16-bit PCM."""
 
-    def seekable(self) -> bool:
+    FRAME_DURATION_S = 0.020
+    SAMPLE_RATE = 48000
+    NCHANNELS = 2
+    SAMPLES_PER_FRAME = int(SAMPLE_RATE * FRAME_DURATION_S)
+    BYTES_PER_SAMPLE = 2  # 16-bit
+    FRAME_SIZE_BYTES = SAMPLES_PER_FRAME * NCHANNELS * BYTES_PER_SAMPLE  # 3840
+
+    def __init__(self, q: QueueSource):
+        self.q = q
+        self.started = False
+
+    def start(self) -> None:
+        self.started = True
+        # prime decoder: 48 kHz, stereo, signed16, no dither, frame = SAMPLES_PER_FRAME
+        self._pcm_gen = miniaudio.stream_any(
+            source=self.q,
+            source_format=miniaudio.FileFormat.MP3,
+            output_format=miniaudio.SampleFormat.SIGNED16,
+            nchannels=self.NCHANNELS,
+            sample_rate=self.SAMPLE_RATE,
+            frames_to_read=self.SAMPLES_PER_FRAME,
+            dither=miniaudio.DitherMode.NONE,
+        )
+        # skip initial dummy
+        next(self._pcm_gen, None)
+
+    def read(self) -> bytes:
+        """Return exactly 20ms of PCM (3840 bytes), or b'' at end."""
+        if not self.started:
+            self.start()
+        try:
+            pcm_arr = next(self._pcm_gen)
+        except StopIteration:
+            return b""
+        if not pcm_arr:
+            return b""
+        data = pcm_arr.tobytes()
+        if len(data) < self.FRAME_SIZE_BYTES:
+            return b""
+        return data
+
+    def cleanup(self) -> None:
+        self._pcm_gen = None
+        self._buffer = None
+
+    def is_opus(self) -> bool:
         return False
 
 
@@ -144,40 +192,39 @@ async def on_message(message: discord.Message) -> None:
             logger.info(f"Converting message to speech: {content}")
             voice = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
             communicate = edge_tts.Communicate(content, voice)
-            file = QueueIO()
+            file = QueueSource()
 
             voice_client = message.guild.voice_client
 
-            def play() -> Future:
-                # Check if voice client is already playing
-                if voice_client.is_playing():
-                    voice_client.stop()
+            # Check if voice client is already playing
+            if voice_client.is_playing():
+                voice_client.stop()
 
-                # Play the audio
-                return voice_client.play(
-                    discord.FFmpegPCMAudio(file, pipe=True),
-                    wait_finish=True,
-                )
+            # Play the audio
+            future = voice_client.play(
+                MP3AudioSource(file),
+                wait_finish=True,
+            )
 
-            future: Future | None = None
             start = time.time()
+            first = None
             try:
                 async for chunk in communicate.stream():
                     # Start playing only when the first audio chunk is received
                     # to avoid unnecessarily starting ffmpeg process
-                    if future is None:
+                    if first is None:
                         first = time.time()
-                        future = play()
                     if future.done():
                         logger.info("Voice interrupted before stream finished.")
                         break
                     if chunk["type"] == "audio":
                         file.write(chunk["data"])
                 done = time.time()
-                logger.info(
-                    f"First chunk latency: {first - start:.2f}s, "
-                    f"Total latency: {done - start:.2f}s"
-                )
+                if first is not None:
+                    logger.info(
+                        f"First chunk latency: {first - start:.2f}s, "
+                        f"Total latency: {done - start:.2f}s"
+                    )
             finally:
                 file.done()
         except NoAudioReceived:
