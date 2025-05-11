@@ -2,6 +2,8 @@ import logging
 import os
 import queue
 import re
+import time
+from asyncio import Future
 from typing import Optional
 
 import discord
@@ -23,7 +25,7 @@ bot = discord.Bot(intents=intents)
 
 
 def _clean_emojis(text: str) -> str:
-    """Remove Discord emojis from the text."""
+    """Turn Discord emojis into plain text."""
     text = re.sub(r"<a?:(\w+):\d+>", r"\1", text).strip()
     return text
 
@@ -133,11 +135,12 @@ async def on_message(message: discord.Message) -> None:
         and message.guild.voice_client.is_connected()
         and message.channel.id == message.guild.voice_client.channel.id
     ):
-        # Convert text to speech using Microsoft Edge TTS
+        content = message.clean_content
+        content = _clean_emojis(content)
+        if not content:
+            logger.info("Skipping empty message.")
+            return
         try:
-            # Since we're already in an async function, we can await directly
-            content = message.clean_content
-            content = _clean_emojis(content)
             logger.info(f"Converting message to speech: {content}")
             voice = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
             communicate = edge_tts.Communicate(content, voice)
@@ -145,30 +148,41 @@ async def on_message(message: discord.Message) -> None:
 
             voice_client = message.guild.voice_client
 
-            # Check if voice client is already playing
-            if voice_client.is_playing():
-                voice_client.stop()
+            def play() -> Future:
+                # Check if voice client is already playing
+                if voice_client.is_playing():
+                    voice_client.stop()
 
-            # Play the audio
-            future = voice_client.play(
-                discord.FFmpegPCMAudio(file, pipe=True),
-                wait_finish=True,
-            )
+                # Play the audio
+                return voice_client.play(
+                    discord.FFmpegPCMAudio(file, pipe=True),
+                    wait_finish=True,
+                )
 
+            future: Future | None = None
+            start = time.time()
             try:
                 async for chunk in communicate.stream():
+                    # Start playing only when the first audio chunk is received
+                    # to avoid unnecessarily starting ffmpeg process
+                    if future is None:
+                        first = time.time()
+                        future = play()
                     if future.done():
                         logger.info("Voice interrupted before stream finished.")
                         break
                     if chunk["type"] == "audio":
                         file.write(chunk["data"])
+                done = time.time()
+                logger.info(
+                    f"First chunk latency: {first - start:.2f}s, "
+                    f"Total latency: {done - start:.2f}s"
+                )
             finally:
                 file.done()
-
-            await future
         except NoAudioReceived:
             # Silently ignore when no audio is received
-            logger.error(f"No audio received for message: {message.content}")
+            logger.info(f"No audio received for message: {message.content}")
 
 
 if __name__ == "__main__":
