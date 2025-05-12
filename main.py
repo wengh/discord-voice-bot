@@ -163,6 +163,23 @@ async def join(ctx: discord.ApplicationContext) -> None:
 
     voice_channel = ctx.author.voice.channel
 
+    # Check permissions
+    permissions = voice_channel.permissions_for(guild.me)
+
+    perms_status = {
+        "view channel": permissions.view_channel,
+        "connect": permissions.connect,
+        "speak": permissions.speak,
+    }
+    missing = [p for p, v in perms_status.items() if not v]
+
+    if missing:
+        await ctx.send_response(
+            f"Missing permissions in <#{voice_channel.id}>: {', '.join(missing)}",
+            ephemeral=True,
+        )
+        return
+
     logger.info(
         f"Invited to join #{voice_channel.name} in {guild.name} by {ctx.author.name}."
     )
