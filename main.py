@@ -33,18 +33,21 @@ CLOUDFLARE_WORKER_URL = os.getenv(
 )  # The URL of your Cloudflare Worker
 
 
+DEFAULT_VOICE = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
+
+
 def get_from_kv_store(key: str) -> str:
     try:
         response = requests.get(f"{CLOUDFLARE_WORKER_URL}/kv/{key}")
+
         if response.status_code == 404:
             logger.error(f"Key '{key}' not found in KV store. Using default voice.")
-            return edge_tts.constants.DEFAULT_VOICE
+            return DEFAULT_VOICE
         response.raise_for_status()
-
         return response.text
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching key '{key}' from KV store: {e}")
-        return edge_tts.constants.DEFAULT_VOICE
+        return DEFAULT_VOICE
 
 
 def set_in_kv_store(key: str, value: str) -> bool:
@@ -55,11 +58,9 @@ def set_in_kv_store(key: str, value: str) -> bool:
             headers={"Content-Type": "application/json"},
         )
         response.raise_for_status()  # Raise an exception for HTTP errors
-
-        return response.status_code == 200
     except requests.exceptions.RequestException as e:
         logger.error(f"Error setting key '{key}' in KV store: {e}")
-        return False
+        raise
 
 
 def _clean_emojis(text: str) -> str:
@@ -178,7 +179,7 @@ async def join(ctx: discord.ApplicationContext) -> None:
     )
 
     await ctx.respond(
-        f"Joined {voice_channel.name}! I will read messages out loud.", ephemeral=True
+        f"Joined <#{voice_channel.id}>! I will read messages out loud.", ephemeral=True
     )
 
 
@@ -188,8 +189,9 @@ async def leave(ctx: discord.ApplicationContext) -> None:
     if not ctx.voice_client:
         await ctx.respond("I am not connected to a voice channel.", ephemeral=True)
         return
+    channel_id = ctx.voice_client.channel.id
     await ctx.voice_client.disconnect()
-    await ctx.respond("Disconnected from the voice channel.", ephemeral=True)
+    await ctx.respond(f"Disconnected from <#{channel_id}>.", ephemeral=True)
 
 
 _voices_cache: list[Voice] | None = None
@@ -256,24 +258,43 @@ async def set_language(
         autocomplete=list_voices_for_language,
     ),
 ):
-    """Set a key-value pair in the Cloudflare KV store using the user's Discord ID as the key."""
-    key = str(ctx.author.id)
+    """Set the language and voice for your current voice channel."""
+    if not ctx.author.voice or not ctx.author.voice.channel:
+        await ctx.respond(
+            "You must be in a voice channel to set your language and voice.",
+            ephemeral=True,
+        )
+        return
+
+    channel_id = ctx.author.voice.channel.id
+    key = str(channel_id)
     if voice not in [v["ShortName"] for v in await list_voices()]:
         await ctx.respond(
             f"Voice `{voice}` is not available. Please select a valid voice.",
             ephemeral=True,
         )
         return
-    success = set_in_kv_store(key, voice)
-    if success:
+
+    try:
+        set_in_kv_store(key, voice)
         await ctx.respond(
-            f"Your key `{key}` was set successfully with value `{voice}`.",
+            f"Set voice for <#{channel_id}> to `{voice}`.",
+            ephemeral=False,
+        )
+    except requests.exceptions.RequestException as e:
+        await ctx.respond(
+            f"Failed to set voice for <#{channel_id}>. Error: {e}",
             ephemeral=True,
         )
-    else:
-        await ctx.respond(
-            f"Failed to set your key `{key}` in the KV store.", ephemeral=True
-        )
+
+
+@bot.slash_command()
+async def language_samples(ctx: discord.ApplicationContext):
+    """Listen to audio samples of available voices."""
+    ctx.respond(
+        "https://geeksta.net/tools/tts-samples/",
+        ephemeral=True,
+    )
 
 
 @bot.event
@@ -317,6 +338,7 @@ async def on_message(message: discord.Message) -> None:
         and message.guild.voice_client.is_connected()
         and message.channel.id == message.guild.voice_client.channel.id
     ):
+        voice_client = message.guild.voice_client
         content = message.clean_content
         content = _clean_emojis(content)
         if not content:
@@ -324,12 +346,9 @@ async def on_message(message: discord.Message) -> None:
             return
         try:
             logger.info(f"Converting message to speech: {content}")
-            voice = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
-            voice = get_from_kv_store(str(message.author.id))
+            voice = get_from_kv_store(str(voice_client.channel.id))
             communicate = edge_tts.Communicate(content, voice)
             file = QueueSource()
-
-            voice_client = message.guild.voice_client
 
             # Check if voice client is already playing
             if voice_client.is_playing():
