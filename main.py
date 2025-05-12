@@ -3,6 +3,7 @@ import os
 import queue
 import re
 import time
+from collections import Counter
 from typing import Optional
 
 import discord
@@ -13,6 +14,7 @@ import requests
 from discord import Option, OptionChoice
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
+from edge_tts.typing import Voice
 
 load_dotenv()
 
@@ -190,26 +192,82 @@ async def leave(ctx: discord.ApplicationContext) -> None:
     await ctx.respond("Disconnected from the voice channel.", ephemeral=True)
 
 
+_voices_cache: list[Voice] | None = None
+
+
+async def list_voices() -> list[Voice]:
+    global _voices_cache
+    if _voices_cache is None:
+        _voices_cache = await edge_tts.list_voices()
+        logger.info(f"Cached {len(_voices_cache)} voices from Edge TTS.")
+    return _voices_cache
+
+
+async def list_languages(ctx: discord.AutocompleteContext) -> list[str]:
+    keyword = ctx.options["language"]
+    languages = Counter()
+    for voice in await list_voices():
+        if keyword in voice["Locale"]:
+            languages[voice["Locale"]] += 1
+    # Sort by number of voices
+    return [k for k, v in languages.most_common(25)]
+
+
+async def list_voices_for_language(
+    ctx: discord.AutocompleteContext,
+) -> list[discord.OptionChoice]:
+    language = ctx.options["language"]
+    is_valid = language in await list_languages(ctx)
+    choices: list[discord.OptionChoice] = []
+    for voice in await list_voices():
+        if not is_valid or voice["Locale"] == language:
+            short_name = (
+                voice["ShortName"]
+                .removeprefix(voice["Locale"] + "-")
+                .removesuffix("Neural")
+            )
+            gender = voice["Gender"]
+            personalities = voice["VoiceTag"]["VoicePersonalities"]
+            categories = voice["VoiceTag"]["ContentCategories"]
+            description = f"{gender}: {short_name} ({', '.join(personalities)}) ({', '.join(categories)})"
+            choices.append(
+                OptionChoice(
+                    name=description,
+                    value=voice["ShortName"],
+                )
+            )
+    choices.sort(key=lambda x: x.name)
+    return choices
+
+
 @bot.slash_command()
 async def set_language(
     ctx: discord.ApplicationContext,
-    value: str = Option(
+    language: str = Option(
         str,
         "Select a language",
-        choices=[
-            OptionChoice(
-                name="EmmaMultilingualNeural", value="en-US-EmmaMultilingualNeural"
-            ),
-            OptionChoice(name="XiaoyiNeural", value="zh-CN-XiaoyiNeural"),
-        ],
+        required=True,
+        autocomplete=list_languages,
+    ),
+    voice: str = Option(
+        str,
+        "Select a voice",
+        required=True,
+        autocomplete=list_voices_for_language,
     ),
 ):
     """Set a key-value pair in the Cloudflare KV store using the user's Discord ID as the key."""
     key = str(ctx.author.id)
-    success = set_in_kv_store(key, value)
+    if voice not in [v["ShortName"] for v in await list_voices()]:
+        await ctx.respond(
+            f"Voice `{voice}` is not available. Please select a valid voice.",
+            ephemeral=True,
+        )
+        return
+    success = set_in_kv_store(key, voice)
     if success:
         await ctx.respond(
-            f"Your key `{key}` was set successfully with value `{value}`.",
+            f"Your key `{key}` was set successfully with value `{voice}`.",
             ephemeral=True,
         )
     else:
