@@ -6,9 +6,11 @@ import time
 from typing import Optional
 
 import discord
+from discord import Option, OptionChoice
 import edge_tts
 import edge_tts.constants
 import miniaudio
+import requests
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 
@@ -23,6 +25,36 @@ intents.voice_states = True
 
 bot = discord.Bot(intents=intents)
 
+
+CLOUDFLARE_WORKER_URL = os.getenv("CLOUDFLARE_WORKER_URL")  # The URL of your Cloudflare Worker
+
+def get_from_kv_store(key: str) -> str:
+    try:
+        response = requests.get(f"{CLOUDFLARE_WORKER_URL}/kv/{key}")
+        if response.status_code == 404:
+            logger.error(f"Key '{key}' not found in KV store. Using default voice.")
+            return edge_tts.constants.DEFAULT_VOICE
+        response.raise_for_status()
+
+        return response.text
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching key '{key}' from KV store: {e}")
+        return edge_tts.constants.DEFAULT_VOICE
+
+
+def set_in_kv_store(key: str, value: str) -> bool:
+    try:
+        response = requests.put(
+            f"{CLOUDFLARE_WORKER_URL}/kv/{key}",
+            data=value,
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()  # Raise an exception for HTTP errors
+
+        return response.status_code == 200
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error setting key '{key}' in KV store: {e}")
+        return False
 
 def _clean_emojis(text: str) -> str:
     """Turn Discord emojis into plain text."""
@@ -154,6 +186,23 @@ async def leave(ctx: discord.ApplicationContext) -> None:
     await ctx.respond("Disconnected from the voice channel.", ephemeral=True)
 
 
+@bot.slash_command()
+async def set_language(ctx: discord.ApplicationContext, value: Option(
+        str,
+        "Select a language",
+        choices=[
+            OptionChoice(name="EmmaMultilingualNeural", value="en-US-EmmaMultilingualNeural"),
+            OptionChoice(name="XiaoyiNeural", value="zh-CN-XiaoyiNeural")
+        ],
+    )):
+    """Set a key-value pair in the Cloudflare KV store using the user's Discord ID as the key."""
+    key = str(ctx.author.id)
+    success = set_in_kv_store(key, value)
+    if success:
+        await ctx.respond(f"Your key `{key}` was set successfully with value `{value}`.", ephemeral=True)
+    else:
+        await ctx.respond(f"Failed to set your key `{key}` in the KV store.", ephemeral=True)
+
 @bot.event
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
@@ -203,6 +252,7 @@ async def on_message(message: discord.Message) -> None:
         try:
             logger.info(f"Converting message to speech: {content}")
             voice = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
+            voice = get_from_kv_store(str(message.author.id))
             communicate = edge_tts.Communicate(content, voice)
             file = QueueSource()
 
