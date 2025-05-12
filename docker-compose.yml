@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     pull_policy: build
     environment:
+      - CLOUDFLARE_WORKER_URL=${CLOUDFLARE_WORKER_URL}
       - BOT_TOKEN=${BOT_TOKEN}
       - EDGE_TTS_VOICE=${EDGE_TTS_VOICE}
     restart: unless-stopped

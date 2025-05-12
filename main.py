@@ -6,11 +6,11 @@ import time
 from typing import Optional
 
 import discord
-from discord import Option, OptionChoice
 import edge_tts
 import edge_tts.constants
 import miniaudio
 import requests
+from discord import Option, OptionChoice
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 
@@ -26,7 +26,10 @@ intents.voice_states = True
 bot = discord.Bot(intents=intents)
 
 
-CLOUDFLARE_WORKER_URL = os.getenv("CLOUDFLARE_WORKER_URL")  # The URL of your Cloudflare Worker
+CLOUDFLARE_WORKER_URL = os.getenv(
+    "CLOUDFLARE_WORKER_URL"
+)  # The URL of your Cloudflare Worker
+
 
 def get_from_kv_store(key: str) -> str:
     try:
@@ -55,6 +58,7 @@ def set_in_kv_store(key: str, value: str) -> bool:
     except requests.exceptions.RequestException as e:
         logger.error(f"Error setting key '{key}' in KV store: {e}")
         return False
+
 
 def _clean_emojis(text: str) -> str:
     """Turn Discord emojis into plain text."""
@@ -187,21 +191,32 @@ async def leave(ctx: discord.ApplicationContext) -> None:
 
 
 @bot.slash_command()
-async def set_language(ctx: discord.ApplicationContext, value: Option(
+async def set_language(
+    ctx: discord.ApplicationContext,
+    value: str = Option(
         str,
         "Select a language",
         choices=[
-            OptionChoice(name="EmmaMultilingualNeural", value="en-US-EmmaMultilingualNeural"),
-            OptionChoice(name="XiaoyiNeural", value="zh-CN-XiaoyiNeural")
+            OptionChoice(
+                name="EmmaMultilingualNeural", value="en-US-EmmaMultilingualNeural"
+            ),
+            OptionChoice(name="XiaoyiNeural", value="zh-CN-XiaoyiNeural"),
         ],
-    )):
+    ),
+):
     """Set a key-value pair in the Cloudflare KV store using the user's Discord ID as the key."""
     key = str(ctx.author.id)
     success = set_in_kv_store(key, value)
     if success:
-        await ctx.respond(f"Your key `{key}` was set successfully with value `{value}`.", ephemeral=True)
+        await ctx.respond(
+            f"Your key `{key}` was set successfully with value `{value}`.",
+            ephemeral=True,
+        )
     else:
-        await ctx.respond(f"Failed to set your key `{key}` in the KV store.", ephemeral=True)
+        await ctx.respond(
+            f"Failed to set your key `{key}` in the KV store.", ephemeral=True
+        )
+
 
 @bot.event
 async def on_voice_state_update(
