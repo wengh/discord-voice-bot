@@ -27,10 +27,7 @@ intents.voice_states = True
 
 bot = discord.Bot(intents=intents)
 
-
-envs_url = os.getenv("CLOUDFLARE_WORKER_URL")
-
-CLOUDFLARE_WORKER_URL = envs_url if envs_url and envs_url.startswith("https://") else "https://" + envs_url
+CLOUDFLARE_WORKER_URL = os.getenv("CLOUDFLARE_WORKER_URL")
 
 
 DEFAULT_VOICE = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
