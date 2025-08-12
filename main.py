@@ -15,6 +15,7 @@ from discord import Option, OptionChoice
 from dotenv import load_dotenv
 from edge_tts.exceptions import NoAudioReceived
 from edge_tts.typing import Voice
+from urllib.parse import urljoin
 
 load_dotenv()
 
@@ -35,7 +36,7 @@ DEFAULT_VOICE = os.getenv("EDGE_TTS_VOICE", edge_tts.constants.DEFAULT_VOICE)
 
 def get_from_kv_store(key: str) -> str:
     try:
-        response = requests.get(f"{CLOUDFLARE_WORKER_URL}/kv/{key}")
+        response = requests.get(urljoin(CLOUDFLARE_WORKER_URL, f"kv/{key}"))
 
         if response.status_code == 404:
             logger.debug(f"Key '{key}' not found in KV store. Using default voice.")
