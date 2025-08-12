@@ -51,7 +51,7 @@ def get_from_kv_store(key: str) -> str:
 def set_in_kv_store(key: str, value: str) -> bool:
     try:
         response = requests.put(
-            f"{CLOUDFLARE_WORKER_URL}/kv/{key}",
+            urljoin(CLOUDFLARE_WORKER_URL, f"kv/{key}"),
             data=value,
             headers={"Content-Type": "application/json"},
         )
