@@ -4,6 +4,7 @@ FROM python:3.11-alpine
 # Install opus
 RUN apk update && apk add --no-cache \
     opus-dev \
+    git \
     && rm -rf /var/cache/apk/*
 
 # Used in main.py
@@ -26,5 +27,9 @@ ADD . /app
 RUN --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
+
+# Uninstall git
+RUN apk del git
+RUN rm -rf /var/cache/apk/*
 
 CMD [".venv/bin/python", "main.py"]
