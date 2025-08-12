@@ -11,3 +11,6 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",
 ]
+
+[tool.uv.sources]
+py-cord = { git = "https://github.com/Pycord-Development/pycord", rev = "e1814cce4bb7ed54d970ac5fe6900f8e65bb1879" }

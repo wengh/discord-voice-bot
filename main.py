@@ -38,7 +38,7 @@ def get_from_kv_store(key: str) -> str:
         response = requests.get(f"{CLOUDFLARE_WORKER_URL}/kv/{key}")
 
         if response.status_code == 404:
-            logger.error(f"Key '{key}' not found in KV store. Using default voice.")
+            logger.debug(f"Key '{key}' not found in KV store. Using default voice.")
             return DEFAULT_VOICE
         response.raise_for_status()
         return response.text
